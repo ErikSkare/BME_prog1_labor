@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
+
 
 void jobbra_lep(int *pozicio) {
     (*pozicio)++;
-    if(*pozicio >= 32768) exit(-1);
+    if(*pozicio > 32767) exit(-1);
 }
 
 void balra_lep(int *pozicio) {
@@ -20,106 +20,104 @@ void csokkentes(signed char *memoria, int pozicio) {
     memoria[pozicio]--;
 }
 
-void kiir(signed char *memoria, int pozicio, signed char *kimenet, int *kimenet_hossz) {
-    kimenet[*kimenet_hossz] = memoria[pozicio];
-    (*kimenet_hossz)++;
+void kiir(signed char *memoria, int pozicio) {
+    putchar(memoria[pozicio]);
 }
 
 void beolvas(signed char *memoria, int pozicio) {
-    scanf("%c", &memoria[pozicio]);
-    if(memoria[pozicio] == '\0') memoria[pozicio] = -1;
+    int eredmeny = getchar();
+    if(eredmeny == EOF) memoria[pozicio] = -1;
+    else memoria[pozicio] = eredmeny;
 }
 
-void ciklus_kezdete(int *zarojel_poziciok, int *teteje, int index, int ertek, int *skip) {
-    if(ertek == 0) {
-        (*skip)++;
-        return;
+void ciklus_kezdete(signed char *memoria, int pozicio, char *programkod, int *index) {
+    if(memoria[pozicio] == 0) {
+        int hanyadik = 0;
+        while(programkod[*index] != ']' || hanyadik != 1) {
+            if(programkod[*index] == '[') hanyadik++;
+            else if(programkod[*index] == ']') hanyadik--;
+            (*index)++;
+        }
     }
-    (*teteje)++;
-    zarojel_poziciok[*teteje] = index;
+    (*index)++;
 }
 
-int ciklus_vege(int *zarojel_poziciok, int *teteje, int index, int ertek, int *skip) {
-    if(*skip > 0) {
-        (*skip)--;
-        return index + 1;
+void ciklus_vege(signed char *memoria, int pozicio, char *programkod, int *index) {
+    if(memoria[pozicio] != 0) {
+        int hanyadik = 0;
+        while(programkod[*index] != '[' || hanyadik != 1) {
+            if(programkod[*index] == ']') hanyadik++;
+            else if(programkod[*index] == '[') hanyadik--;
+            (*index)--;
+        }
     }
-    int temp = zarojel_poziciok[*teteje];
-    (*teteje)--;
-    if(ertek == 0) return index + 1;
-    else return temp;
+    (*index)++;
 }
 
 int main()
 {
-    // Programkód megadása
-    //A keresztnevemet kiíró program
-    char programkod[]="+++++++[>++++++++++<-]>-.<+++++[>+++++++++<-]>.---------.++.";
+    //A keresztnevemet kiÃ­rÃ³ program
+    char programkod[] = "+++++++[>++++++++++<-]>-.<+++++[>+++++++++<-]>.---------.++.";
 
-    //Zárójelek helyességének tesztelése
-    int zarojelek = 0;
-    for(int i = 0; programkod[i] != '\0'; i++) {
-        if(programkod[i] == '[') zarojelek++;
-        else if(programkod[i] == ']') zarojelek--;
-        if(zarojelek < 0) exit(-1);
-    }
-    if(zarojelek != 0) exit(-1);
-
-    // Változók inicializálása
+    //MemÃ³ria
     signed char memoria[32768];
     int pozicio = 0;
 
-    signed char kimenet[32768];
-    int kimenet_hossz = 0;
+    //ZÃ¡rÃ³jelek helyessÃ©gÃ©nek tesztelÃ©se
+    int elojeles_zarojelek = 0;
+    for(int i = 0; programkod[i] != '\0'; i++) {
+        if(programkod[i] == '[') elojeles_zarojelek++;
+        else if(programkod[i] == ']') elojeles_zarojelek--;
+        if(elojeles_zarojelek < 0) exit(-1);
+    }
+    if(elojeles_zarojelek != 0) exit(-1);
 
-    int zarojel_poziciok[1000];
-    int teteje = -1;
-    int skip = 0;
-
-    //Karakterek feldolgozása
-    int i = 0;
-    while(programkod[i] != '\0') {
-        switch(programkod[i]) {
+    //ProgramkÃ³d feldolgozÃ¡sa
+    int index = 0;
+    while(programkod[index] != '\0') {
+        switch(programkod[index]) {
             case '>':
-                if(skip == 0) jobbra_lep(&pozicio);
-                i++;
+                jobbra_lep(&pozicio);
+                index++;
                 break;
+
             case '<':
-                if(skip == 0) balra_lep(&pozicio);
-                i++;
+                balra_lep(&pozicio);
+                index++;
                 break;
+
             case '+':
-                if(skip == 0) noveles(memoria, pozicio);
-                i++;
+                noveles(memoria, pozicio);
+                index++;
                 break;
+
             case '-':
-                if(skip == 0) csokkentes(memoria, pozicio);
-                i++;
+                csokkentes(memoria, pozicio);
+                index++;
                 break;
+
             case '.':
-                if(skip == 0) kiir(memoria, pozicio, kimenet, &kimenet_hossz);
-                i++;
+                kiir(memoria, pozicio);
+                index++;
                 break;
+
             case ',':
-                if(skip == 0) beolvas(memoria, pozicio);
-                i++;
+                beolvas(memoria, pozicio);
+                index++;
                 break;
+
             case '[':
-                ciklus_kezdete(zarojel_poziciok, &teteje, i, memoria[pozicio], &skip);
-                i++;
+                ciklus_kezdete(memoria, pozicio, programkod, &index);
                 break;
+
             case ']':
-                i = ciklus_vege(zarojel_poziciok, &teteje, i, memoria[pozicio], &skip);
+                ciklus_vege(memoria, pozicio, programkod, &index);
                 break;
+
             default:
-                i++;
+                index++;
                 break;
         }
     }
-
-    for(int i = 0; i < kimenet_hossz; i++) {
-        printf("%c", kimenet[i]);
-    }
-
     return 0;
 }

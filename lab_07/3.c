@@ -1,6 +1,5 @@
-#include <iostream>
+#include <stdio.h>
 
-using namespace std;
 
 void iterativ_elore(int *tomb, int meret) {
     for(int i = 0; i < meret; i++)

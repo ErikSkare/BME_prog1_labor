@@ -1,6 +1,5 @@
-#include <iostream>
+#include <stdio.h>
 
-using namespace std;
 
 void kiir(int szam) {
     int mod = szam % 1000;

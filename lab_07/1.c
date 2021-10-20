@@ -1,6 +1,5 @@
-#include <iostream>
+#include <stdio.h>
 
-using namespace std;
 
 // fib(5)-re:
 //-------------------------

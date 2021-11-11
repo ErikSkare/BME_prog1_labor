@@ -2,50 +2,61 @@
 #include <SDL2_gfxPrimitives.h>
 #include <math.h>
 #include <stdlib.h>
-#include <stdbool.h>
 
 typedef struct Szin {
     int r, g, b, a;
 } Szin;
 
-Sint16 szog_konvertal(float szog, float max_szog, int kepernyo_meret) {
-    return (Sint16) (kepernyo_meret / 2 * (1 + szog / max_szog));
+Sint16 szog_atvalt(float szog, float max_szog, int meret) {
+    return (Sint16) (meret / 2 * (1 + szog / max_szog));
 }
 
-int koordinata_tomb_meret_meghataroz(float const *szog_tomb) {
-    int i = 0;
-    while(szog_tomb[i] != 0 || szog_tomb[i+1] != 0 || szog_tomb[i+2] != -1 || szog_tomb[i+3] != -1)
-        ++i;
-    return i / 2 + 1;
+int meret_meghataroz(const float *szog_tomb) {
+    int meret = 0;
+    while(szog_tomb[meret] != -1 || szog_tomb[meret + 1] != -1)
+        meret += 2;
+    return meret / 2;
 }
 
-void koordinata_tomb_kepez(float const *szog_tomb, bool xt, int kt_meret, Sint16 **eredmeny, int k_szelesseg, int k_magassag) {
-    *eredmeny = (Sint16*) malloc(kt_meret * sizeof(Sint16));
-    for(int i = 0; i < kt_meret; i++)
-        if(xt)
-            (*eredmeny)[i] = szog_konvertal(szog_tomb[2 * i], 180, k_szelesseg);
-        else
-            (*eredmeny)[i] = szog_konvertal(szog_tomb[2 * i + 1], -90, k_magassag);
+Sint16 *szetvalogat(const float *szog_tomb, int eredmeny_meret, int offset, float max_szog, int screen_meret) {
+    Sint16 *eredmeny = (Sint16*) malloc(eredmeny_meret * sizeof(Sint16));
+    for(int i = 0; i < eredmeny_meret; ++i)
+        eredmeny[i] = szog_atvalt(szog_tomb[2*i+offset], max_szog, screen_meret);
+    return eredmeny;
 }
 
-void tomb_kirajzol(SDL_Renderer *renderer, Sint16 *vx, Sint16 *vy, int n, Szin szin, int k_szelesseg, int k_magassag) {
+void kirajzol(SDL_Renderer *renderer, const float *szog_tomb, int kepernyo_szelesseg, int kepernyo_magassag, Szin kitoltes, Szin korvonal) {
+    int meret = meret_meghataroz(szog_tomb);
+    Sint16 *vx = szetvalogat(szog_tomb, meret, 0, 180, kepernyo_szelesseg);
+    Sint16 *vy = szetvalogat(szog_tomb, meret, 1, -90, kepernyo_magassag);
     int offset = 0;
-    for(int i = 0; i < n; ++i)
-        if(vx[i] == k_szelesseg / 2 && vy[i] == k_magassag / 2) {
-            filledPolygonRGBA(renderer, vx + offset, vy + offset, i - offset - 1, szin.r, szin.g, szin.b, szin.a);
-            aapolygonRGBA(renderer, vx + offset, vy + offset, i - offset - 1, 0, 0, 0, 75);
+    for(int i = 0; i < meret; ++i) {
+        if(vx[i] == kepernyo_szelesseg / 2 && vy[i] == kepernyo_magassag / 2) {
+            filledPolygonRGBA(renderer, vx + offset, vy + offset, i - offset, kitoltes.r, kitoltes.g, kitoltes.b, kitoltes.a);
+            aapolygonRGBA(renderer, vx + offset, vy + offset, i - offset, korvonal.r, korvonal.g, korvonal.b, korvonal.a);
             offset = i + 1;
         }
+    }
+    free(vx);
+    free(vy);
 }
 
-void racs_kirajzol(SDL_Renderer *renderer, int k_szelesseg, int k_magassag, float felbontas) {
-    for(float i = -180; i <= 180; i+=felbontas) {
-        Sint16 x = szog_konvertal(i, 180, k_szelesseg);
-        lineRGBA(renderer, x, 0, x, k_magassag, 0, 0, 0, 50);
+void pont_megjelol_szoveggel(SDL_Renderer *renderer, float hosszusag, float szelesseg, char *szoveg, int kepernyo_sz, int kepernyo_m) {
+    Sint16 x = szog_atvalt(hosszusag, 180, kepernyo_sz);
+    Sint16 y = szog_atvalt(szelesseg, -90, kepernyo_m);
+    lineRGBA(renderer, x - 5, y - 5, x + 5, y + 5, 255, 0, 0, 255);
+    lineRGBA(renderer, x - 5, y + 5, x + 5, y - 5, 255, 0, 0, 255);
+    stringRGBA(renderer, x + 10, y - 10, szoveg, 255, 0, 0, 255);
+}
+
+void racs_kirajzol(SDL_Renderer *renderer, float felbontas, int kepernyo_sz, int kepernyo_m, Szin szin) {
+    for(float i = -180; i <= 180; i += felbontas) {
+        Sint16 x = szog_atvalt(i, 180, kepernyo_sz);
+        lineRGBA(renderer, x, 0, x, kepernyo_m, szin.r, szin.g, szin.b, szin.a);
     }
-    for(float i = -90; i <= 90; i+=felbontas) {
-        Sint16 y = szog_konvertal(i, -90, k_magassag);
-        lineRGBA(renderer, 0, y, k_szelesseg, y, 0, 0, 0, 50);
+    for(float i = -90; i <= 90; i += felbontas) {
+        Sint16 y = szog_atvalt(i, -90, kepernyo_m);
+        lineRGBA(renderer, 0, y, kepernyo_sz, y, szin.r, szin.g, szin.b, szin.a);
     }
 }
 
@@ -60,7 +71,6 @@ void sdl_init(char const *felirat, int szeles, int magas, SDL_Window **pwindow, 
         SDL_Log("Nem hozhato letre az ablak: %s", SDL_GetError());
         exit(1);
     }
-
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     if (renderer == NULL) {
         SDL_Log("Nem hozhato letre a megjelenito: %s", SDL_GetError());
@@ -327,43 +337,25 @@ int main(int argc, char *argv[]) {
         -79.8, 44.8, -81.3, 44.6, -82.7, 44, -83.9, 43.9, -83.3, 45.2, -84.7, 45.9, -83.2, 46.2, -81.6, 46.1, 0, 0, -84.9, 45.8, -86,
         44.9, -86.5, 43.7, -86.2, 42.4, -87.5, 41.7, -87.9, 43.2, -88, 44.7, -87, 45.7, 0, 0, -1, -1
     };
+
+    int kepernyo_szelesseg = 1080, kepernyo_magassag = 540;
     /* ablak letrehozasa */
     SDL_Window *window;
     SDL_Renderer *renderer;
+    sdl_init("SDL peldaprogram", kepernyo_szelesseg, kepernyo_magassag, &window, &renderer);
 
-    int kepernyo_szelesseg = 1080, kepernyo_magassag = 540;
-    Sint16 bme_x = szog_konvertal(19.0532947, 180, kepernyo_szelesseg);
-    Sint16 bme_y = szog_konvertal(47.4813297, -90, kepernyo_magassag);
-    sdl_init("Vilagterkep szorgalmi", kepernyo_szelesseg, kepernyo_magassag, &window, &renderer);
+    kirajzol(renderer, vilag, kepernyo_szelesseg, kepernyo_magassag, (Szin){0, 255, 0, 255}, (Szin){0, 0, 0, 75});
+    kirajzol(renderer, tavak, kepernyo_szelesseg, kepernyo_magassag, (Szin){0, 0, 255, 255}, (Szin){0, 0, 0, 75});
+    pont_megjelol_szoveggel(renderer, 19.0451891, 47.4695317, "BME", kepernyo_szelesseg, kepernyo_magassag);
+    racs_kirajzol(renderer, 15, kepernyo_szelesseg, kepernyo_magassag, (Szin){0, 0, 0, 75});
 
-    int v_kt_meret = koordinata_tomb_meret_meghataroz(vilag);
-    int t_kt_meret = koordinata_tomb_meret_meghataroz(tavak);
-    Sint16 *v_x_tomb, *v_y_tomb;
-    Sint16 *t_x_tomb, *t_y_tomb;
-    koordinata_tomb_kepez(vilag, true, v_kt_meret, &v_x_tomb, kepernyo_szelesseg, kepernyo_magassag);
-    koordinata_tomb_kepez(vilag, false, v_kt_meret, &v_y_tomb, kepernyo_szelesseg, kepernyo_magassag);
-    koordinata_tomb_kepez(tavak, true, t_kt_meret, &t_x_tomb, kepernyo_szelesseg, kepernyo_magassag);
-    koordinata_tomb_kepez(tavak, false, t_kt_meret, &t_y_tomb, kepernyo_szelesseg, kepernyo_magassag);
-
-    tomb_kirajzol(renderer, v_x_tomb, v_y_tomb, v_kt_meret, (Szin) {0, 255, 0, 255}, kepernyo_szelesseg, kepernyo_magassag);
-    tomb_kirajzol(renderer, t_x_tomb, t_y_tomb, t_kt_meret, (Szin) {0, 0, 255, 255}, kepernyo_szelesseg, kepernyo_magassag);
-    racs_kirajzol(renderer, kepernyo_szelesseg, kepernyo_magassag, 15);
-
-    lineRGBA(renderer, bme_x - 5, bme_y - 5, bme_x + 5, bme_y + 5, 255, 0, 0, 255);
-    lineRGBA(renderer, bme_x + 5, bme_y - 5, bme_x - 5, bme_y + 5, 255, 0, 0, 255);
-    stringRGBA(renderer, bme_x + 10, bme_y - 10, "BME", 255, 0, 0, 255);
-
-    free(v_x_tomb);
-    free(v_y_tomb);
-    free(t_x_tomb);
-    free(t_y_tomb);
     /* az elvegzett rajzolasok a kepernyore */
     SDL_RenderPresent(renderer);
 
     /* varunk a kilepesre */
     SDL_Event ev;
     while (SDL_WaitEvent(&ev) && ev.type != SDL_QUIT && ev.type != SDL_MOUSEBUTTONDOWN)
-        ;
+    ;
 
     /* ablak bezarasa */
     SDL_Quit();
